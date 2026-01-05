@@ -1,6 +1,6 @@
 FROM php:8.2-apache
 
-# System deps + PHP extensions
+# System dependencies and PHP extensions
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -18,10 +18,10 @@ RUN apt-get update && apt-get install -y \
     zip \
  && rm -rf /var/lib/apt/lists/*
 
-# Install Composer safely (no apt)
+# Install Composer correctly
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Apache modules
+# Enable Apache modules
 RUN a2enmod rewrite
 
 # Enforce single Apache MPM at runtime
@@ -39,10 +39,14 @@ RUN printf '%s\n' \
 COPY . /var/www/html
 WORKDIR /var/www/html
 
-# Install PHP dependencies
-RUN composer install --no-dev --no-interaction --prefer-dist || true
+# Install Composer deps INTO src/vendor (critical)
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --working-dir=/var/www/html/src
 
-# Apache vhost, ChurchCRM lives in /src
+# Apache vhost, ChurchCRM runs from /src
 RUN printf '%s\n' \
   '<VirtualHost *:80>' \
   '  DocumentRoot /var/www/html/src' \
