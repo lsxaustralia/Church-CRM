@@ -16,6 +16,12 @@ RUN apt-get update && apt-get install -y \
     gd \
     zip
 
+# Disable all MPMs first
+RUN a2dismod mpm_event mpm_worker mpm_prefork || true
+
+# Enable the correct one for mod_php
+RUN a2enmod mpm_prefork
+
 RUN a2enmod rewrite
 
 COPY . /var/www/html
