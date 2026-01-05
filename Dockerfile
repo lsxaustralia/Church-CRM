@@ -1,6 +1,6 @@
 FROM php:8.2-apache
 
-# Install system dependencies and PHP extensions required by ChurchCRM
+# System deps, PHP extensions, and Composer
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     git \
+    composer \
  && docker-php-ext-install \
     pdo \
     pdo_mysql \
@@ -18,14 +19,13 @@ RUN apt-get update && apt-get install -y \
     zip \
  && rm -rf /var/lib/apt/lists/*
 
-# Enable Apache modules
+# Apache modules
 RUN a2enmod rewrite
 
-# Enforce single Apache MPM at runtime
+# Force single Apache MPM at runtime
 RUN printf '%s\n' \
   '#!/bin/sh' \
   'set -e' \
-  '' \
   'rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf || true' \
   'a2enmod mpm_prefork >/dev/null 2>&1 || true' \
   'a2dismod mpm_event mpm_worker >/dev/null 2>&1 || true' \
@@ -33,26 +33,28 @@ RUN printf '%s\n' \
   > /usr/local/bin/railway-start \
  && chmod +x /usr/local/bin/railway-start
 
-# Configure Apache vhost explicitly for ChurchCRM
+# Copy app
+COPY . /var/www/html
+WORKDIR /var/www/html
+
+# Install PHP dependencies (ChurchCRM uses Composer)
+RUN composer install --no-dev --no-interaction --prefer-dist || true
+
+# Set Apache DocumentRoot to ChurchCRM web root
 RUN printf '%s\n' \
   '<VirtualHost *:80>' \
-  '  DocumentRoot /var/www/html' \
+  '  DocumentRoot /var/www/html/src' \
   '  DirectoryIndex index.php index.html' \
-  '  <Directory /var/www/html>' \
+  '  <Directory /var/www/html/src>' \
   '    AllowOverride All' \
   '    Require all granted' \
   '  </Directory>' \
   '</VirtualHost>' \
   > /etc/apache2/sites-available/000-default.conf
 
-# Copy application
-COPY . /var/www/html
-WORKDIR /var/www/html
-
 # Permissions
 RUN chown -R www-data:www-data /var/www/html \
  && chmod -R 755 /var/www/html
 
 EXPOSE 80
-
 CMD ["/usr/local/bin/railway-start"]
